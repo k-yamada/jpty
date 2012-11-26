@@ -20,14 +20,14 @@ class ProcessSpawn
     end
 
     # Initialise the process thread.
-    processThread = ProcessThread.new(executor);
+    @process_thread = ProcessThread.new(executor);
   end
 
   ##
   #  This method stops the spawned process.
   # /
   def stop
-    processThread.stop();
+    @process_thread.stop();
   end
 
   ##
@@ -39,35 +39,35 @@ class ProcessSpawn
   # /
   def start
     # Start the process
-    processThread.start();
+    @process_thread.start();
   end
 
   ##
   #  @return the input stream of the process.
   # /
   def getStdout
-    processThread.process.getInputStream();
+    @process_thread.process.getInputStream();
   end
 
   ##
   #  @return the output stream of the process.
   # /
   def getStdin
-    processThread.process.getOutputStream();
+    @process_thread.process.getOutputStream();
   end
 
   ##
   #  @return the error stream of the process.
   # /
   def getStderr
-    processThread.process.getErrorStream();
+    @process_thread.process.getErrorStream();
   end
 
   ##
   #  @return true if the process has exited.
   # /
   def isClosed
-    processThread.isClosed;
+    @process_thread.isClosed;
   end
 
   ##
@@ -81,7 +81,7 @@ class ProcessSpawn
     if (!isClosed()) 
       raise "Process is still running"
     end
-    processThread.exitValue;
+    @process_thread.exitValue;
   end
 
   ##
@@ -108,9 +108,10 @@ class ProcessSpawn
     #  @throws IOException if process spawning fails
     # /
     def start
-      @thread = Thread.new(this, "ExpectJ: " + @executor);
+      @thread = Thread.new {
+        run
+      }
       @process = @executor.execute();
-      @thread.start();
     end
 
     ##

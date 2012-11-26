@@ -7,6 +7,7 @@ java_import java.nio.channels.Pipe;
 java_import java.nio.channels.SelectionKey;
 java_import java.nio.channels.Selector;
 java_import java.util.Date;
+require_relative 'spawnable_helper'
 
 ##
 #  This class is used for talking to processes / ports. This will also interact

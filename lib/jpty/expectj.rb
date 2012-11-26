@@ -45,17 +45,21 @@ class ExpectJ
   #  @see Runtime#exec(String)
   # /
   class MyExecutor
+    def initialize(command)
+      @command = command
+    end
+
     def execute
-      return Runtime.getRuntime().exec(command);
+      java.lang.Runtime.getRuntime().exec(@command);
     end
 
     def toString() 
-      return command;
+      command;
     end
   end
 
   def spawn(command) 
-    launch_spawn(ProcessSpawn.new(MyExecutor.new))
+    launch_spawn(ProcessSpawn.new(MyExecutor.new(command)))
   end
 
   ##
