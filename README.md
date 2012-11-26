@@ -1,6 +1,6 @@
 # Jpty
 
-TODO: Write a gem description
+PTY for jruby using expectj.
 
 ## Installation
 
@@ -18,7 +18,11 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+    require 'jpty'
+
+    shell = JPTY.spawn("/bin/sh", 5)
+    shell.send("echo Chunder\n")
+    shell.expect("Chunder")
 
 ## Contributing
 
@@ -27,3 +31,4 @@ TODO: Write usage instructions here
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
+

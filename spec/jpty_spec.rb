@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-#describe JPTY do
+describe JPTY do
   describe ".sh" do
     it "should expect echo" do
       shell = JPTY.spawn("/bin/sh", 5)
@@ -8,4 +8,4 @@ require 'spec_helper'
       shell.expect("Chunder")
     end
   end
-#end
+end

@@ -10,7 +10,7 @@ Gem::Specification.new do |gem|
   gem.email         = ["kyamada@sonix.asia"]
   gem.description   = %q{PTY for jruby}
   gem.summary       = %q{PTY for jruby using expectj}
-  gem.homepage      = ""
+  gem.homepage      = "https://github.com/k-yamada/jpty"
 
   gem.files         = `git ls-files`.split($/)
   gem.executables   = gem.files.grep(%r{^bin/}).map{ |f| File.basename(f) }
