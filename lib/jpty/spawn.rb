@@ -32,21 +32,20 @@ class Spawn
     if lDefaultTimeOutSeconds < -1
       raise "Timeout must be >= -1, was " + lDefaultTimeOutSeconds
     end
-    m_lDefaultTimeOutSeconds = lDefaultTimeOutSeconds;
+    @m_lDefaultTimeOutSeconds = lDefaultTimeOutSeconds;
 
     slave = SpawnableHelper.new(spawn, lDefaultTimeOutSeconds, echo);
     slave.start();
-    log("Spawned Process: " + spawn);
 
-    if (slave.getStdin() != null) 
-      toStdin = BufferedWriter.new(OutputStreamWriter.new(slave.getStdin()));
+    if (slave.getStdin() != nil) 
+      @toStdin = BufferedWriter.new(OutputStreamWriter.new(slave.getStdin()));
     end
 
-    stdoutSelector = Selector.open();
-    slave.getStdoutChannel().register(stdoutSelector, SelectionKey.OP_READ);
-    if (slave.getStderrChannel() != null) 
+    @stdoutSelector = Selector.open();
+    slave.getStdoutChannel().register(@stdoutSelector, SelectionKey::OP_READ);
+    if (slave.getStderrChannel() != nil) 
       stderrSelector = Selector.open();
-      slave.getStderrChannel().register(stderrSelector, SelectionKey.OP_READ);
+      slave.getStderrChannel().register(stderrSelector, SelectionKey::OP_READ);
     end
   end
 
@@ -54,9 +53,10 @@ class Spawn
   #  This method is invoked by our {@link Timer} when the time-out occurs.
   
   def timerTimedOut() 
+    puts "==== timerTimedOut"
     continueReading = false;
-    stdoutSelector.wakeup();
-    if (stderrSelector != null) 
+    @stdoutSelector.wakeup();
+    if (stderrSelector != nil) 
       stderrSelector.wakeup();
     end
     synchronized (doneWaitingForClose) {
@@ -76,13 +76,96 @@ class Spawn
   ##
   #  Wait for a pattern to appear on standard out.
   #  @param pattern The case-insensitive substring to match against.
+  #  @throws TimeoutException on timeout waiting for pattern
+  #  @throws IOException on IO trouble waiting for pattern
+  
+  def expect(pattern)
+    expect(pattern, @m_lDefaultTimeOutSeconds);
+  end
+
+  ##
+  #  Wait for a pattern to appear on standard out.
+  #  @param pattern The case-insensitive substring to match against.
   #  @param timeOutSeconds The timeout in seconds before the match fails.
   #  @throws IOException on IO trouble waiting for pattern
   #  @throws TimeoutException on timeout waiting for pattern
   
   def expect(pattern, timeOutSeconds)
-    expect(pattern, timeOutSeconds, stdoutSelector);
+    expect(pattern, timeOutSeconds, @stdoutSelector);
   end
+
+  ##
+  #  Workhorse of the expect() and expectErr() methods.
+  #  @see #expect(String, long)
+  #  @param pattern What to look for
+  #  @param lTimeOutSeconds How long to look before giving up
+  #  @param selector A selector covering only the channel we should read from
+  #  @throws IOException on IO trouble waiting for pattern
+  #  @throws TimeoutException on timeout waiting for pattern
+  
+  def expect(pattern, lTimeOutSeconds=@m_lDefaultTimeOutSeconds, selector=@stdoutSelector)
+    if (lTimeOutSeconds < -1) 
+      raise "Timeout must be >= -1, was " + lTimeOutSeconds
+    end
+
+    if (selector.keys().size() != 1) 
+      raise "Selector key set size must be 1, was " + selector.keys().size()
+    end
+    # If this cast fails somebody gave us the wrong selector.
+    readMe = (selector.keys().iterator().next()).channel();
+
+    continueReading = true;
+    found = false;
+    line = java.lang.StringBuilder.new;
+    runUntil = nil;
+    if (lTimeOutSeconds > 0) 
+      runUntil = Date.new(Date.new.getTime() + lTimeOutSeconds);
+    end
+    buffer = ByteBuffer.allocate(1024);
+    while(continueReading) 
+      if (runUntil == nil) 
+        selector.select();
+      else
+        msLeft = runUntil.getTime() - Date.new.getTime();
+        if (msLeft > 0) 
+          selector.select(msLeft);
+        else
+          continueReading = false;
+          break;
+        end
+      end
+      if (selector.selectedKeys().size() == 0)
+        # Woke up with nothing selected, try again
+        next;
+      end
+
+      buffer.rewind();
+      readCount = readMe.read(buffer);
+      if (readCount == -1) 
+        # End of stream
+        raise "End of stream reached, no match found"
+      end
+      buffer.rewind();
+      line.append(String.new(buffer.array(), buffer.arrayOffset(), readCount, "ISO-8859-1"));
+      if (line.toString().trim().toUpperCase().indexOf(pattern.toUpperCase()) != -1) 
+        log("Found match for " + pattern + ":" + line);
+        found = true;
+        break;
+      end
+      while (line.indexOf("\n") != -1)
+        line.delete(0, line.indexOf("\n") + 1);
+      end
+    end
+    if (found)
+      log("Match found, continueReading=" + continueReading)
+    else
+      log("Timed out waiting for match, continueReading=")
+    end
+    if (!continueReading)
+      raise "Timeout trying to match \"" + pattern 
+    end
+  end
+
 
   ##
   #  Wait for the spawned process to finish.
@@ -100,7 +183,7 @@ class Spawn
     end
 
     log("Waiting for spawn to close connection...");
-    Timer tm = null;
+    Timer tm = nil;
     slave.setCloseListener(Spawnable.new.CloseListener() {
       def onClose()
         synchronized (doneWaitingForClose) {
@@ -137,7 +220,7 @@ class Spawn
         end
       end
     }
-    if (tm != null)
+    if (tm != nil)
       tm.close();
     end
     if (closed)
@@ -145,7 +228,7 @@ class Spawn
     else 
       log("Timed out waiting for spawn to close, continueReading=" + continueReading)
     end
-    if (tm != null) 
+    if (tm != nil) 
       log("Timer Status:" + tm.getStatus());
     end
     if (!continueReading)
@@ -161,23 +244,23 @@ class Spawn
   def freeResources() 
     begin
       slave.close();
-      if (interactIn != null) 
+      if (interactIn != nil) 
         interactIn.stopProcessing();
       end
-      if (interactOut != null) 
+      if (interactOut != nil) 
         interactOut.stopProcessing();
       end
-      if (interactErr != null) 
+      if (interactErr != nil) 
         interactErr.stopProcessing();
       end
-      if (stderrSelector != null) 
+      if (stderrSelector != nil) 
         stderrSelector.close();
       end
-      if (stdoutSelector != null)
-        stdoutSelector.close();
+      if (@stdoutSelector != nil)
+        @stdoutSelector.close();
       end
-      if (toStdin != null)
-        toStdin.close();
+      if (@toStdin != nil)
+        @toStdin.close();
       end
     rescue
       # Cleaning up is a best effort operation, failures are
@@ -195,90 +278,7 @@ class Spawn
   #  @see ExpectJ#ExpectJ(long)
   
   def expectClose()
-    expectClose(m_lDefaultTimeOutSeconds);
-  end
-
-  ##
-  #  Workhorse of the expect() and expectErr() methods.
-  #  @see #expect(String, long)
-  #  @param pattern What to look for
-  #  @param lTimeOutSeconds How long to look before giving up
-  #  @param selector A selector covering only the channel we should read from
-  #  @throws IOException on IO trouble waiting for pattern
-  #  @throws TimeoutException on timeout waiting for pattern
-  
-  def expect(pattern, lTimeOutSeconds, selector)
-    if (lTimeOutSeconds < -1) 
-      raise "Timeout must be >= -1, was " + lTimeOutSeconds
-    end
-
-    if (selector.keys().size() != 1) 
-      raise "Selector key set size must be 1, was " + selector.keys().size()
-    end
-    # If this cast fails somebody gave us the wrong selector.
-    readMe = (selector.keys().iterator().next()).channel();
-
-    log("Expecting '" + pattern + "'");
-    continueReading = true;
-    boolean found = false;
-    line = StringBuilder.new;
-    runUntil = null;
-    if (lTimeOutSeconds > 0) 
-      runUntil = Date.new(Date.new.getTime() + lTimeOutSeconds);
-    end
-    buffer = ByteBuffer.allocate(1024);
-    while(continueReading) 
-      if (runUntil == null) 
-        selector.select();
-      else
-        long msLeft = runUntil.getTime() - Date.new.getTime();
-        if (msLeft > 0) 
-          selector.select(msLeft);
-        else
-          continueReading = false;
-          break;
-        end
-      end
-      if (selector.selectedKeys().size() == 0)
-        # Woke up with nothing selected, try again
-        continue;
-      end
-
-      buffer.rewind();
-      int readCount = readMe.read(buffer);
-      if (readCount == -1) 
-        # End of stream
-        raise "End of stream reached, no match found"
-      end
-      buffer.rewind();
-      line.append(String.new(buffer.array(), buffer.arrayOffset(), readCount, "ISO-8859-1"));
-      if (line.toString().trim().toUpperCase().indexOf(pattern.toUpperCase()) != -1) 
-        log("Found match for " + pattern + ":" + line);
-        found = true;
-        break;
-      end
-      while (line.indexOf("\n") != -1)
-        line.delete(0, line.indexOf("\n") + 1);
-      end
-    end
-    if (found)
-      log("Match found, continueReading=" + continueReading)
-    else
-      log("Timed out waiting for match, continueReading=" + continueReading)
-    end
-    if (!continueReading)
-      raise "Timeout trying to match \"" + pattern 
-    end
-  end
-
-  ##
-  #  Wait for a pattern to appear on standard out.
-  #  @param pattern The case-insensitive substring to match against.
-  #  @throws TimeoutException on timeout waiting for pattern
-  #  @throws IOException on IO trouble waiting for pattern
-  
-  def expect(pattern)
-    expect(pattern, m_lDefaultTimeOutSeconds);
+    expectClose(@m_lDefaultTimeOutSeconds);
   end
 
 
@@ -309,9 +309,8 @@ class Spawn
   #  @throws IOException on IO trouble talking to spawn
   
   def send(string)
-    log("Sending '" + string + "'");
-    toStdin.write(string);
-    toStdin.flush();
+    @toStdin.write(string);
+    @toStdin.flush();
   end
 
   ##
@@ -319,14 +318,14 @@ class Spawn
   
   def interact()
     # FIXME: User input is echoed twice on the screen
-    interactIn = StreamPiper.new(null,
+    interactIn = StreamPiper.new(nil,
                    System.in, slave.getStdin());
     interactIn.start();
-    interactOut = StreamPiper.new(null,
+    interactOut = StreamPiper.new(nil,
                     Channels.newInputStream(slave.getStdoutChannel()),
                     System.out);
     interactOut.start();
-    interactErr = StreamPiper.new(null,
+    interactErr = StreamPiper.new(nil,
                     Channels.newInputStream(slave.getStderrChannel()),
                     System.err);
     interactErr.start();

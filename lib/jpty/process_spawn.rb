@@ -89,6 +89,7 @@ class ProcessSpawn
   #  thread.
   # /
   class ProcessThread 
+    attr_accessor :process
     include java.lang.Runnable
 
     ##
@@ -111,6 +112,7 @@ class ProcessSpawn
       @thread = Thread.new {
         run
       }
+      puts "==== spawn_start"
       @process = @executor.execute();
     end
 

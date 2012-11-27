@@ -7,6 +7,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 require 'thread'
 require_relative 'timer'
+require_relative 'stream_piper'
 
 
 ##
@@ -30,7 +31,6 @@ class SpawnableHelper
     end
     @spawnable = runMe;
     @echo = echo;
-    @semaphore = Mutex.new
   end
 
   def timerTimedOut
@@ -104,20 +104,22 @@ class SpawnableHelper
     end
 
     # Starting the piped streams and StreamPiper objects
-    systemOut = Pipe.open();
-    systemOut.source().configureBlocking(false);
-    spawnOutToSystemOut = new StreamPiper(echo ? System.out : nil,
+    @systemOut = Pipe.open();
+    @systemOut.source().configureBlocking(false);
+    @copyStream = @echo# ? java.lang.System.out : nil
+    spawnOutToSystemOut = StreamPiper.new(@copyStream,
                         @spawnable.getStdout(),
-                        Channels.newOutputStream(systemOut.sink()));
+                        Channels.newOutputStream(@systemOut.sink()));
+    puts "======"
     spawnOutToSystemOut.start();
 
     if (@spawnable.getStderr() != nil) 
-      systemErr = Pipe.open();
-      systemErr.source().configureBlocking(false);
+      @systemErr = Pipe.open();
+      @systemErr.source().configureBlocking(false);
 
-      spawnErrToSystemErr = new StreamPiper(echo ? System.err : nil,
+      spawnErrToSystemErr = StreamPiper.new(@echo,
                           @spawnable.getStderr(),
-                          Channels.newOutputStream(systemErr.sink()));
+                          Channels.newOutputStream(@systemErr.sink()));
       spawnErrToSystemErr.start();
     end
   end
@@ -146,14 +148,14 @@ class SpawnableHelper
         puts "Closing stdout source failed"
       end
     end
-    if (systemErr != nil) 
+    if (@systemErr != nil) 
       begin
-        systemErr.sink().close();
+        @systemErr.sink().close();
       rescue
         puts "Closing stderr sink failed"
       end
       begin
-        systemErr.source().close();
+        @systemErr.source().close();
       rescue
         puts "Closing stderr source failed"
       end
@@ -164,7 +166,7 @@ class SpawnableHelper
   #  @return a channel from which data produced by the spawn can be read
   #  
   def getStdoutChannel()
-    systemOut.source();
+    @systemOut.source();
   end
 
   ##
@@ -179,10 +181,10 @@ class SpawnableHelper
   #  nil if there is no channel to stderr.
   #  
   def getStderrChannel
-    if (systemErr == nil)
+    if (@systemErr == nil)
       return nil;
     end
-    systemErr.source()
+    @systemErr.source()
   end
 
   ##
